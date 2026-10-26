@@ -1,0 +1,5 @@
+{
+  "name": "Planday Pay Reports",
+  "description": "A tool to retrieve and export salary cost allocation and payroll reports via the Planday Open API.",
+  "requestFramePermissions": []
+}
