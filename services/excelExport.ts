@@ -7,12 +7,16 @@ export function exportCostAllocationReportToExcel(rows: CostAllocationReportRow[
       "Planday Employee API ID",
       "Salary Identifier (Payroll ID)",
       "Full name",
+      "Employee Type",
+      "Contract Rule",
       "Cost Allocation"
     ],
     ...rows.map(r => [
       r.employeeId,
       r.salaryIdentifier || "",
       r.fullName,
+      r.employeeType || "",
+      r.contractRule || "",
       r.costAllocation
     ])
   ];
@@ -24,6 +28,8 @@ export function exportCostAllocationReportToExcel(rows: CostAllocationReportRow[
     { wch: 26 }, // Planday Employee API ID
     { wch: 30 }, // Salary Identifier (Payroll ID)
     { wch: 28 }, // Full name
+    { wch: 24 }, // Employee Type
+    { wch: 28 }, // Contract Rule
     { wch: 55 }  // Cost Allocation
   ];
 
@@ -51,7 +57,7 @@ export function exportCostAllocationReportToExcel(rows: CostAllocationReportRow[
     }
   };
 
-  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:D1');
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:F1');
   for (let C = range.s.c; C <= range.e.c; ++C) {
     const headerCell = XLSX.utils.encode_cell({ r: 0, c: C });
     if (ws[headerCell]) {
@@ -64,7 +70,13 @@ export function exportCostAllocationReportToExcel(rows: CostAllocationReportRow[
     for (let C = range.s.c; C <= range.e.c; ++C) {
       const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
       if (ws[cellRef]) {
-        const align = C === 0 ? "center" : C === 1 ? "center" : "left";
+        // C=0: ID (center)
+        // C=1: Payroll ID (center)
+        // C=2: Full name (left)
+        // C=3: Employee Type (left)
+        // C=4: Contract Rule (left)
+        // C=5: Cost Allocation (left)
+        const align = (C === 0 || C === 1) ? "center" : "left";
         ws[cellRef].s = {
           ...cellStyle,
           alignment: { vertical: "center", horizontal: align },

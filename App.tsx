@@ -593,8 +593,10 @@ export default function App() {
         const matchName = r.fullName.toLowerCase().includes(q);
         const matchId = String(r.employeeId).includes(q);
         const matchPayrollId = r.salaryIdentifier.toLowerCase().includes(q);
+        const matchType = r.employeeType.toLowerCase().includes(q);
+        const matchRule = r.contractRule.toLowerCase().includes(q);
         const matchAlloc = r.costAllocation.toLowerCase().includes(q);
-        return matchName || matchId || matchPayrollId || matchAlloc;
+        return matchName || matchId || matchPayrollId || matchType || matchRule || matchAlloc;
       }
 
       return true;
@@ -608,7 +610,7 @@ export default function App() {
 
         {/* Logged in Header Banner */}
         {currentStep !== 'auth' && (
-          <div className="my-8 max-w-5xl mx-auto w-full">
+          <div className="my-8 max-w-6xl mx-auto w-full">
             <div className="flex flex-wrap justify-between items-center bg-white border border-gray-200 px-6 py-3.5 rounded-xl shadow-sm gap-4">
               <div className="flex items-center gap-3">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
@@ -642,7 +644,7 @@ export default function App() {
           </div>
         )}
 
-        <main className="max-w-5xl mx-auto w-full flex-grow">
+        <main className="max-w-6xl mx-auto w-full flex-grow">
           {error && (
             <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-r-lg shadow-sm flex items-start justify-between">
               <div>
@@ -699,6 +701,8 @@ export default function App() {
                   <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200 font-mono text-gray-700">Planday Employee API ID</span>
                   <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200 font-mono text-gray-700">Salary Identifier (Payroll ID)</span>
                   <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200 font-mono text-gray-700">Full name</span>
+                  <span className="bg-blue-50 px-2 py-1 rounded border border-blue-200 font-mono text-blue-700 font-medium">Employee Type</span>
+                  <span className="bg-blue-50 px-2 py-1 rounded border border-blue-200 font-mono text-blue-700 font-medium">Contract Rule</span>
                   <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200 font-mono text-gray-700">Cost Allocation</span>
                 </div>
               </div>
@@ -777,7 +781,7 @@ export default function App() {
                     <div>
                       <h4 className="font-bold text-gray-900">Ready to Generate</h4>
                       <p className="text-sm text-gray-500">
-                        The app will fetch the current cost allocation for the {filteredEmployees.length} selected employee{filteredEmployees.length === 1 ? '' : 's'}.
+                        The app will fetch the current cost allocation and contract rule for the {filteredEmployees.length} selected employee{filteredEmployees.length === 1 ? '' : 's'}.
                       </p>
                     </div>
                     <button
@@ -799,7 +803,7 @@ export default function App() {
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                         <span className="font-bold text-gray-900 text-sm">
-                          Fetching Cost Allocations... ({generationProgress.completed} of {generationProgress.total})
+                          Fetching Report Data... ({generationProgress.completed} of {generationProgress.total})
                         </span>
                       </div>
                       <button
@@ -891,10 +895,10 @@ export default function App() {
 
               {/* Table Filter & Search Controls */}
               <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-wrap items-center justify-between gap-4">
-                <div className="flex-1 min-w-[240px]">
+                <div className="flex-1 min-w-[260px]">
                   <input
                     type="text"
-                    placeholder="Search by name, employee ID, payroll ID, or allocation..."
+                    placeholder="Search by name, ID, payroll ID, employee type, contract rule, or allocation..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full text-sm px-3.5 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
@@ -925,7 +929,7 @@ export default function App() {
                     Report Preview ({displayedRows.length} of {reportRows.length} rows)
                   </h3>
                   <span className="text-xs text-gray-500">
-                    Matches exact format generated in the Excel file
+                    Matches exact 6 columns generated in the Excel file
                   </span>
                 </div>
 
@@ -942,6 +946,12 @@ export default function App() {
                         <th scope="col" className="px-4 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">
                           Full name
                         </th>
+                        <th scope="col" className="px-4 py-3 text-xs font-bold text-blue-700 uppercase tracking-wider bg-blue-50/50">
+                          Employee Type
+                        </th>
+                        <th scope="col" className="px-4 py-3 text-xs font-bold text-blue-700 uppercase tracking-wider bg-blue-50/50">
+                          Contract Rule
+                        </th>
                         <th scope="col" className="px-4 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">
                           Cost Allocation
                         </th>
@@ -950,7 +960,7 @@ export default function App() {
                     <tbody className="bg-white divide-y divide-gray-100">
                       {displayedRows.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="px-6 py-8 text-center text-gray-400 text-sm">
+                          <td colSpan={6} className="px-6 py-8 text-center text-gray-400 text-sm">
                             No matching employee records found.
                           </td>
                         </tr>
@@ -983,6 +993,24 @@ export default function App() {
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-900">
                                 {row.fullName}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-800">
+                                {row.employeeType ? (
+                                  <span className="bg-gray-50 px-2 py-1 rounded border border-gray-200 font-medium">
+                                    {row.employeeType}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400 italic">-</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-800">
+                                {row.contractRule ? (
+                                  <span className="bg-gray-50 px-2 py-1 rounded border border-gray-200 font-medium">
+                                    {row.contractRule}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400 italic">-</span>
+                                )}
                               </td>
                               <td className="px-4 py-3 text-xs">
                                 <span className={`inline-block px-2.5 py-1 rounded-md border font-medium ${badgeBg}`}>

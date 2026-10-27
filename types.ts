@@ -15,6 +15,9 @@ export interface Employee {
   salaryIdentifier?: string | null;
   employeeTypeId?: number;
   primaryDepartmentId?: number | null;
+  contractRuleId?: number | null;
+  contractRulesRuleId?: number | null;
+  contractRuleName?: string | null;
 }
 
 export interface IdName {
@@ -25,11 +28,13 @@ export interface IdName {
 export interface Department extends IdName {}
 export interface EmployeeGroup extends IdName {}
 export interface EmployeeType extends IdName {}
+export interface ContractRule extends IdName {}
 
 export interface DefinitionCollection {
   departments: Department[];
   employeeGroups: EmployeeGroup[];
   employeeTypes: EmployeeType[];
+  contractRules: ContractRule[];
 }
 
 export interface WeekDaysWeight {
@@ -69,9 +74,12 @@ export interface CostAllocationReportRow {
   employeeId: number;
   salaryIdentifier: string;
   fullName: string;
+  employeeType: string;
+  contractRule: string;
   costAllocation: string;
   costAllocationType: 'MonthlySalary' | 'ScheduledHours' | 'BusinessDays' | 'NoAllocation' | 'NotSet' | 'Other';
   rawAllocation?: CostAllocationResponse | null;
+  rawContractRule?: any;
   departmentNames?: string[];
   employeeGroupNames?: string[];
 }

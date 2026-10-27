@@ -225,13 +225,14 @@ export async function fetchPortalInfo(): Promise<any> {
 }
 
 export async function fetchAllDefinitions(): Promise<DefinitionCollection> {
-  const [departments, employeeGroups, employeeTypes] = await Promise.all([
+  const [departments, employeeGroups, employeeTypes, contractRules] = await Promise.all([
     fetchPaginatedData('/hr/v1.0/departments').catch(() => []),
     fetchPaginatedData('/hr/v1.0/employeegroups').catch(() => []),
     fetchPaginatedData('/hr/v1.0/employeetypes').catch(() => []),
+    fetchPaginatedData('/contractrules/v1/contractrules').catch(() => []),
   ]);
 
-  return { departments, employeeGroups, employeeTypes };
+  return { departments, employeeGroups, employeeTypes, contractRules };
 }
 
 /**
@@ -260,6 +261,31 @@ export async function fetchEmployeeCostAllocation(employeeId: number): Promise<C
     return json.data !== undefined ? json.data : json;
   } catch (err) {
     console.warn(`Error fetching cost allocation for employee ${employeeId}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Endpoint:
+ * GET https://openapi.planday.com/contractrules/v1/employees/{employeeId}
+ */
+export async function fetchEmployeeContractRule(employeeId: number): Promise<any | null> {
+  try {
+    const response = await fetchWithAuth(`${API_BASE_URL}/contractrules/v1/employees/${employeeId}`);
+    if (response.status === 204 || response.status === 404) {
+      return null;
+    }
+    if (!response.ok) {
+      return null;
+    }
+    const text = await response.text();
+    if (!text || !text.trim()) {
+      return null;
+    }
+    const json = JSON.parse(text);
+    return json.data !== undefined ? json.data : json;
+  } catch (err) {
+    console.warn(`Error fetching contract rule for employee ${employeeId}:`, err);
     return null;
   }
 }
@@ -339,7 +365,71 @@ export function formatCostAllocation(data: CostAllocationResponse | null | undef
 }
 
 /**
- * Batch fetch cost allocations with concurrency control, progress callback, and abort support.
+ * Resolve employee type display name
+ */
+export function resolveEmployeeTypeName(
+  emp: Employee, 
+  employeeTypeMap: Map<number, string>
+): string {
+  if (emp.employeeTypeId !== undefined && emp.employeeTypeId !== null) {
+    const mapped = employeeTypeMap.get(Number(emp.employeeTypeId));
+    if (mapped) return mapped;
+  }
+
+  const direct = (emp as any).employeeType;
+  if (direct) {
+    if (typeof direct === 'string') return direct;
+    if (typeof direct === 'object' && direct.name) return direct.name;
+  }
+
+  const directName = (emp as any).employeeTypeName;
+  if (directName && typeof directName === 'string') return directName;
+
+  if (emp.employeeTypeId) return `Type #${emp.employeeTypeId}`;
+
+  return '';
+}
+
+/**
+ * Resolve contract rule display name
+ */
+export function resolveContractRuleName(
+  contractRuleData: any, 
+  emp: Employee, 
+  contractRuleMap: Map<number, string>
+): string {
+  if (contractRuleData) {
+    if (typeof contractRuleData === 'string') return contractRuleData;
+    
+    // Check direct name
+    const directName = contractRuleData.name || contractRuleData.ruleName || contractRuleData.contractRuleName || contractRuleData.title;
+    if (directName && typeof directName === 'string') return directName;
+
+    // Check ID reference
+    const ruleId = contractRuleData.ruleId ?? contractRuleData.contractRuleId ?? contractRuleData.id;
+    if (ruleId !== undefined && ruleId !== null) {
+      const mapped = contractRuleMap.get(Number(ruleId));
+      if (mapped) return mapped;
+      if (contractRuleData.rule && contractRuleData.rule.name) return contractRuleData.rule.name;
+      return `Rule #${ruleId}`;
+    }
+  }
+
+  // Fallback to fields on emp record
+  const empRuleId = emp.contractRuleId ?? emp.contractRulesRuleId ?? (emp as any).contractRuleId;
+  if (empRuleId !== undefined && empRuleId !== null) {
+    const mapped = contractRuleMap.get(Number(empRuleId));
+    if (mapped) return mapped;
+  }
+
+  const empRuleName = emp.contractRuleName || (emp as any).contractRule;
+  if (empRuleName && typeof empRuleName === 'string') return empRuleName;
+
+  return '';
+}
+
+/**
+ * Batch fetch cost allocations and contract rules with concurrency control, progress callback, and abort support.
  */
 export async function generateCostAllocationReport(
   employees: Employee[],
@@ -357,6 +447,12 @@ export async function generateCostAllocationReport(
   const groupMap = new Map<number, string>();
   definitions?.employeeGroups.forEach(g => groupMap.set(g.id, g.name));
 
+  const typeMap = new Map<number, string>();
+  definitions?.employeeTypes.forEach(t => typeMap.set(t.id, t.name));
+
+  const ruleMap = new Map<number, string>();
+  definitions?.contractRules.forEach(r => ruleMap.set(r.id, r.name));
+
   const CONCURRENCY = 5;
   let currentIndex = 0;
 
@@ -367,13 +463,23 @@ export async function generateCostAllocationReport(
       const emp = employees[index];
 
       let rawAlloc: CostAllocationResponse | null = null;
+      let rawContractRule: any = null;
+
       try {
-        rawAlloc = await fetchEmployeeCostAllocation(emp.id);
+        // Fetch cost allocation and contract rule in parallel
+        const [allocRes, ruleRes] = await Promise.all([
+          fetchEmployeeCostAllocation(emp.id),
+          fetchEmployeeContractRule(emp.id)
+        ]);
+        rawAlloc = allocRes;
+        rawContractRule = ruleRes;
       } catch (err) {
         console.warn(`Error on employee ${emp.id}:`, err);
       }
 
       const { displayText, category } = formatCostAllocation(rawAlloc);
+      const employeeType = resolveEmployeeTypeName(emp, typeMap);
+      const contractRule = resolveContractRuleName(rawContractRule, emp, ruleMap);
 
       const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || `Employee #${emp.id}`;
       const salaryIdentifier = emp.salaryIdentifier || '';
@@ -388,9 +494,12 @@ export async function generateCostAllocationReport(
         employeeId: emp.id,
         salaryIdentifier,
         fullName,
+        employeeType,
+        contractRule,
         costAllocation: displayText,
         costAllocationType: category,
         rawAllocation: rawAlloc,
+        rawContractRule,
         departmentNames,
         employeeGroupNames
       };
